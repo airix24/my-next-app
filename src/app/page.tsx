@@ -1,101 +1,141 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState } from "react";
+import DraftTopBar, { AllPicks } from "./components/DraftTopBar";
+import PlayerList from "./components/PlayerList";
+import TeamRoster from "./components/TeamRoster";
+import PlayerQueue from "./components/PlayerQueue";
+import {
+  players,
+  NUM_TEAMS,
+  NUM_ROUNDS,
+  USER_TEAM,
+  teamNames,
+} from "./data/constants";
+
+interface Player {
+  name: string;
+  position: string;
+  team: string;
+  opponent: string;
+}
+
+export default function FantasyDraft() {
+  const [currentPick, setCurrentPick] = useState(1);
+  const [availablePlayers, setAvailablePlayers] = useState(players);
+  const [teamRosters, setTeamRosters] = useState<{ [key: number]: Player[] }>({
+    1: [],
+    2: [],
+    3: [],
+    4: [],
+  });
+  const [isDraftOver, setIsDraftOver] = useState(false);
+  const [playerQueue, setPlayerQueue] = useState<Player[]>([]);
+
+  const currentTeam =
+    Math.floor((currentPick - 1) / NUM_TEAMS) % 2 === 0
+      ? ((currentPick - 1) % NUM_TEAMS) + 1
+      : NUM_TEAMS - ((currentPick - 1) % NUM_TEAMS);
+
+  const handleDraft = (player: Player) => {
+    if (isDraftOver) return;
+
+    setTeamRosters((prevRosters) => ({
+      ...prevRosters,
+      [currentTeam]: [...prevRosters[currentTeam], player],
+    }));
+
+    setAvailablePlayers((prevPlayers) =>
+      prevPlayers.filter((p) => p.name !== player.name)
+    );
+
+    const nextPick = currentPick + 1;
+    setCurrentPick(nextPick);
+
+    if (nextPick > NUM_TEAMS * NUM_ROUNDS) {
+      setIsDraftOver(true);
+    }
+  };
+
+  const handleAutoDraft = () => {
+    while (!isDraftOver) {
+      const randomIndex = Math.floor(Math.random() * availablePlayers.length);
+      handleDraft(availablePlayers[randomIndex]);
+    }
+  };
+
+  const getTeamPlayers = (teamNumber: number) => {
+    return teamRosters[teamNumber] || [];
+  };
+
+  const allPicks = Array.from(
+    { length: NUM_TEAMS * NUM_ROUNDS },
+    (_, index) => {
+      const pickNumber = index + 1;
+      const round = Math.ceil(pickNumber / NUM_TEAMS);
+      const teamNumber =
+        round % 2 === 1
+          ? ((pickNumber - 1) % NUM_TEAMS) + 1
+          : NUM_TEAMS - ((pickNumber - 1) % NUM_TEAMS);
+      const player =
+        teamRosters[teamNumber][Math.floor((pickNumber - 1) / NUM_TEAMS)] ||
+        null;
+      return {
+        teamNumber,
+        player,
+      };
+    }
+  );
+
+  const addToQueue = (player: Player) => {
+    setPlayerQueue((prevQueue) => [...prevQueue, player]);
+  };
+
+  const removeFromQueue = (player: Player) => {
+    setPlayerQueue((prevQueue) =>
+      prevQueue.filter((p) => p.name !== player.name)
+    );
+  };
+
+  const updateQueue = (newQueue: Player[]) => {
+    setPlayerQueue(newQueue);
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+    <div className="min-h-screen bg-base-300 text-base-content p-4">
+      <DraftTopBar
+        allPicks={allPicks}
+        currentPick={currentPick}
+        currentTeam={currentTeam}
+        teamNames={teamNames}
+        isDraftOver={isDraftOver}
+        handleAutoDraft={handleAutoDraft}
+        USER_TEAM={USER_TEAM}
+      />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="col-span-1 md:col-span-2">
+          <PlayerList
+            availablePlayers={availablePlayers}
+            isDraftOver={isDraftOver}
+            handleDraft={handleDraft}
+            addToQueue={addToQueue}
+            removeFromQueue={removeFromQueue}
+            queuedPlayers={playerQueue}
+          />
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+        <div>
+          <PlayerQueue
+            queue={playerQueue}
+            removeFromQueue={removeFromQueue}
+            handleDraft={handleDraft}
+            isDraftOver={isDraftOver}
+            updateQueue={updateQueue}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        </div>
+        <div>
+          <TeamRoster teamNames={teamNames} getTeamPlayers={getTeamPlayers} />
+        </div>
+      </div>
     </div>
   );
 }
